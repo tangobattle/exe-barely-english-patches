@@ -12,3 +12,5 @@ make_patch() {
 
 make_patch exe4bm10 bn4bm.gba exe4bm10.gba
 make_patch exe4rs11 bn4rs.gba exe4rs11.gba
+make_patch exe5b bn5p.gba exe5b.gba
+make_patch exe5c bn5c.gba exe5c.gba

@@ -129,7 +129,8 @@ for text_archive in config['text_archives']:
         # TODO: Handle LZ77 compression.
         old_ptr &= ~0x88000000
         if old_ptr != text_archive['new']:
-            raise Exception('Text archive location mismatch')
+            raise Exception(
+                f'text archive location mismatch: {old_ptr:08x} != {text_archive["new"]:08x}')
 
         out[loc:loc+4] = struct.pack('<I', new_ptr | 0x08000000)
 
