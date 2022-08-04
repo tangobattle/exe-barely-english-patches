@@ -85,8 +85,8 @@ mapping = {
 }
 
 
-eor_cc = config['charset']['endControlCode']
-extend_cc = config['charset']['extendCharsetControlCode']
+eor_cc = config['charset']['end_cc']
+extend_cc = config['charset']['extend_cc']
 
 for text_archive in config['text_archives']:
     new_entries = []
