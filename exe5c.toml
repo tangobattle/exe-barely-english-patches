@@ -50,3 +50,12 @@ locations = [
     0x129690,
     0x12EC2C,
 ]
+
+[[text_archives]]
+compressed = true
+old = 0x6E97F0
+new = 0x700874
+locations = [
+    0x12E808,
+    0x1374AC,
+]

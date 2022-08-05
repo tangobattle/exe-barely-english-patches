@@ -4,11 +4,42 @@ import io
 import toml
 import sys
 import struct
+import pyfastgbalz77
 
 
 class C(enum.Enum):
     Control = 0
     Text = 1
+
+
+def unlz77(f):
+    out = bytearray()
+
+    header, = struct.unpack('<I', f.read(4))
+    if (header & 0xff) != 0x10:
+        raise ValueError("invalid header")
+
+    n = header >> 8
+    while len(out) < n:
+        ref, = struct.unpack('<B', f.read(1))
+
+        for i in range(8):
+            if len(out) >= n:
+                break
+
+            if (ref & (0x80 >> i)) == 0:
+                c, = struct.unpack('<B', f.read(1))
+                out.append(c)
+                continue
+
+            info, = struct.unpack('>H', f.read(2))
+            m = info >> 12
+            off = info & 0xfff
+
+            for _ in range(m + 3):
+                out.append(out[-off - 1])
+
+    return bytes(out[:n])
 
 
 def unpack_text_archive_header(f):
@@ -72,7 +103,8 @@ with open(sys.argv[1], 'r') as f:
     config = toml.load(f)
 
 
-old = open(sys.argv[2], 'rb')
+with open(sys.argv[2], 'rb') as f:
+    old = f.read()
 
 with open(sys.argv[3], 'rb') as f:
     out = bytearray(f.read())
@@ -91,15 +123,21 @@ extend_cc = config['charset']['extend_cc']
 for text_archive in config['text_archives']:
     new_entries = []
 
-    # TODO: Handle LZ77 compression.
     offset = text_archive['old']
-    old.seek(offset)
+    r = io.BytesIO(old[offset:])
 
-    header = unpack_text_archive_header(old)
+    if text_archive['compressed']:
+        d = unlz77(r)
+        n, = struct.unpack('<I', d[:4])
+        if len(d) != (n >> 8):
+            raise ValueError("invalid compressed text archive")
+        r = io.BytesIO(d[4:])
+
+    header = unpack_text_archive_header(r)
     for i, suboffset in enumerate(header):
-        old.seek(offset + suboffset)
+        r.seek(suboffset)
         old_text = read_text(
-            old,
+            r,
             header[i + 1] - suboffset if i < len(header) - 1 else -1,
             eor_cc)
 
@@ -120,19 +158,29 @@ for text_archive in config['text_archives']:
     next_alignment = (len(out) + 4 - 1) // 4 * 4
     out.extend(b'\0' * (next_alignment - len(out)))
 
-    # TODO: Handle LZ77 compression.
-    new_ptr = len(out)
+    new_ptr = len(out) | 0x08000000
+
+    if text_archive['compressed']:
+        new_ptr |= 0x80000000
+        out_archive = pyfastgbalz77.compress(
+            struct.pack('<I', (len(out_archive) + 4) << 8) + out_archive, True)
+
     out.extend(out_archive)
 
     for loc in text_archive['locations']:
         old_ptr, = struct.unpack('<I', out[loc:loc+4])
-        # TODO: Handle LZ77 compression.
-        old_ptr &= ~0x88000000
-        if old_ptr != text_archive['new']:
-            raise Exception(
-                f'text archive location mismatch: {old_ptr:08x} != {text_archive["new"]:08x}')
 
-        out[loc:loc+4] = struct.pack('<I', new_ptr | 0x08000000)
+        expected_ptr = text_archive["new"] | 0x08000000
+        if text_archive['compressed']:
+            expected_ptr |= 0x80000000
+
+        print(f'0x{loc:08x}: 0x{expected_ptr:08x} -> 0x{new_ptr:08x}')
+
+        if old_ptr != expected_ptr:
+            raise Exception(
+                f'text archive location mismatch: {old_ptr:08x} != {expected_ptr:08x}')
+
+        out[loc:loc+4] = struct.pack('<I', new_ptr)
 
 with open(sys.argv[4], 'wb') as f:
     f.write(out)
