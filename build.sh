@@ -7,7 +7,7 @@ set -x
 
 make_patch() {
     ./make_rom.py "${1}.toml" "${2}" "${3}" "${1}-en.gba"
-    "$FLIPS" --create "${2}" "${1}-en.gba" "${4}"
+    "$FLIPS" --create "${3}" "${1}-en.gba" "${4}"
 }
 
 make_patch exe4bm10 bn4bm.gba exe4bm10.gba patches/exe4_barely_english/v0.0.0/ROCK_EXE4_BMB4BJ_00.bps
