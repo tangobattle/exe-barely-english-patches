@@ -154,18 +154,23 @@ for text_archive in config['text_archives']:
 
     out_archive = index.getvalue() + w.getvalue()
 
-    # Extend ROM to be aligned on a 4-byte boundary.
-    next_alignment = (len(out) + 4 - 1) // 4 * 4
-    out.extend(b'\0' * (next_alignment - len(out)))
+    # Find free space at the end of the ROM.
+    next_free_loc = len(out) - 1
+    while out[next_free_loc] == 0xff:
+        next_free_loc -= 1
+    next_free_loc += 1
 
-    new_ptr = len(out) | 0x08000000
+    # Extend ROM to be aligned on a 4-byte boundary.
+    next_alignment = (next_free_loc + 4 - 1) // 4 * 4
+
+    new_ptr = next_alignment | 0x08000000
 
     if text_archive['compressed']:
         new_ptr |= 0x80000000
         out_archive = pyfastgbalz77.compress(
             struct.pack('<I', (len(out_archive) + 4) << 8) + out_archive, True)
 
-    out.extend(out_archive)
+    out[next_alignment:next_alignment+len(out_archive)] = out_archive
 
     for loc in text_archive['locations']:
         old_ptr, = struct.unpack('<I', out[loc:loc+4])
